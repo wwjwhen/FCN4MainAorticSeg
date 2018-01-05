@@ -3,6 +3,7 @@ import math
 import os
 import os.path as osp
 import shutil
+#import fcn
 import numpy as np
 import pytz
 import scipy.misc

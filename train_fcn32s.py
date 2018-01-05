@@ -11,6 +11,8 @@ import pytz
 import torch
 import yaml
 
+print('here!32')
+
 configurations = {
     # same configuration as original work
     # https://github.com/shelhamer/fcn.berkeleyvision.org

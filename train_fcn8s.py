@@ -378,7 +378,9 @@ class FCN8s(nn.Module):
         self.score_pool4 = nn.Conv2d(512, n_class, 1)
         
         # new added
+        
         self.score_pool2 = nn.Conv2d(128, n_class, 1)
+        
 
         self.upscore2 = nn.ConvTranspose2d(
             n_class, n_class, 4, stride=2, bias=False)
@@ -386,8 +388,17 @@ class FCN8s(nn.Module):
             n_class, n_class, 16, stride=8, bias=False)
         self.upscore_pool4 = nn.ConvTranspose2d(
             n_class, n_class, 4, stride=2, bias=False)
+        
+        # new added
+        
         self.upscore4 = nn.ConvTranspose2d(
-            n_class, n_class, 16, stride=4, bias=False)
+            n_class, n_class, 8, stride=4, bias=False)
+        
+        # new added
+        '''
+        self.upscore16 = nn.ConvTranspose2d(
+            n_class, n_class, 32, stride=16, bias=False)
+        '''
 
         self._initialize_weights()
 
@@ -447,6 +458,8 @@ class FCN8s(nn.Module):
         score_pool4c = h  # 1/16
         
         h = upscore2 + score_pool4c  # 1/16
+        
+        # fcn pool2
         h = self.upscore_pool4(h)
         upscore_pool4 = h  # 1/8
         
@@ -455,6 +468,8 @@ class FCN8s(nn.Module):
         score_pool3c = h  # 1/8
 
         h = upscore_pool4 + score_pool3c  # 1/8
+        
+        
         # new added
         h = self.upscore2(h)
         upscore_pool3 = h
@@ -462,11 +477,12 @@ class FCN8s(nn.Module):
         h = h[:, :, 17:17 + upscore_pool3.size()[2], 17:17 + upscore_pool3.size()[3]]
         score_pool2c = h
         h = score_pool2c + upscore_pool3
-        h = self.upscore4(h)
+        h = self.upscore4(h) # offset 3
         
  
-        #h = self.upscore8(h)
-        offset = 37
+        #h = self.upscore8(h) # offset 31
+        #h = self.upscore16(h) # offset 27
+        offset = 33
         h = h[:, :, offset:offset + x.size()[2], offset:offset + x.size()[3]].contiguous()#
         
         return h
@@ -524,10 +540,10 @@ configurations = {
     # https://github.com/shelhamer/fcn.berkeleyvision.org
     1: dict(
         max_iteration=500000,
-        lr = 5 * 1.0e-4,
+        lr = 1 * 1.0e-4,
         momentum=0.99,
         weight_decay=0.0005,
-        interval_validate=2250,
+        interval_validate=9000,
         fcn16s_pretrained_model= '/root/data/models/pytorch/fcn16s_from_caffe.pth',
     )
 }
