@@ -144,19 +144,19 @@ class SBDClassSeg(VOCClassSegBase):
                     'img': img_file,
                     'lbl': lbl_file,
                 })
-            #print(len(self.files[split]))
-
+           
     def __getitem__(self, index):
         data_file = self.files[self.split][index]
         # load image
         img_file = data_file['img']
         img = scipy.io.loadmat(img_file, verify_compressed_data_integrity=False)
-        tmp = np.zeros((512, 512, 3), dtype=np.float32)
+        tmp = np.zeros((300, 300, 3), dtype=np.float32)
         img = img['sfile']
         tmp[:, :, 0] = img
         tmp[:, :, 1] = img
         tmp[:, :, 2] = img
         img = tmp
+        #print(img.shape)
         # load label
         lbl_file = data_file['lbl']
         mat = scipy.io.loadmat(lbl_file)
@@ -384,8 +384,10 @@ class FCN8s(nn.Module):
 
         self.upscore2 = nn.ConvTranspose2d(
             n_class, n_class, 4, stride=2, bias=False)
+        '''
         self.upscore8 = nn.ConvTranspose2d(
             n_class, n_class, 16, stride=8, bias=False)
+        '''
         self.upscore_pool4 = nn.ConvTranspose2d(
             n_class, n_class, 4, stride=2, bias=False)
         
@@ -543,7 +545,7 @@ configurations = {
         lr = 1 * 1.0e-4,
         momentum=0.99,
         weight_decay=0.0005,
-        interval_validate=9000,
+        interval_validate=1875,
         fcn16s_pretrained_model= '/root/data/models/pytorch/fcn16s_from_caffe.pth',
     )
 }
@@ -551,18 +553,18 @@ configurations = {
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-g', '--gpu', type=int, required=True)
+    #parser.add_argument('-g', '--gpu', type=int, required=True)
     parser.add_argument('-c', '--config', type=int, default=1,
                         choices=configurations.keys())
     parser.add_argument('--resume', help='Checkpoint path')
     args = parser.parse_args()
 
-    gpu = args.gpu
+    #gpu = args.gpu
     cfg = configurations[args.config]
     out = get_log_dir('fcn8s', args.config, cfg)
     resume = args.resume
 
-    os.environ['CUDA_VISIBLE_DEVICES'] = str(gpu)
+    #os.environ['CUDA_VISIBLE_DEVICES'] = str(gpu)
     cuda = torch.cuda.is_available()
 
     torch.manual_seed(1337)
@@ -575,11 +577,11 @@ def main():
     kwargs = {'num_workers': 4, 'pin_memory': True} if cuda else {}
     train_loader = torch.utils.data.DataLoader(
         SBDClassSeg(root, split='new_train1', transform=True),
-        batch_size=4, shuffle=False, **kwargs)
+        batch_size=32, shuffle=False, **kwargs)
     val_loader = torch.utils.data.DataLoader(
         SBDClassSeg(
             root, split='new_val1', transform=True),
-        batch_size=1, shuffle=False, **kwargs)
+        batch_size=60, shuffle=False, **kwargs)
     # 2. model
 
     model = FCN8s(n_class=2)
@@ -627,4 +629,5 @@ def main():
 
 
 if __name__ == '__main__':
+    print('Do Not Forget the Validation Interval!!')
     main()

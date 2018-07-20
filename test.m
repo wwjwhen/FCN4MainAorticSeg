@@ -32,6 +32,13 @@ for i = 1 : length(samplePaths)
         [sfile, map] = dicomread([spath, '\', sampleFiles(j).name]);
         sfile = single(sfile);
         mfile = imread([mpath, '\', maskFiles(j).name]);
+        sfile = imcrop(sfile, [100, 140, 299, 299]);
+        mfile = imcrop(mfile, [100, 140, 299, 299]);
+        
+%         subplot(121); imshow(sfile, []);
+%         subplot(122); imshow(mfile, []);
+%         pause(0.01);
+        
         mfile = imfill(mfile);
         mfile(mfile < 100) = 0;
         mfile(mfile > 100) = 1;
@@ -42,9 +49,7 @@ for i = 1 : length(samplePaths)
         save(['E:\imgmats2\', num2str(ind, '%05d'), '.mat'], 'sfile');
         save(['E:\lblmats2\', num2str(ind, '%05d'), '.mat'], 'mfile');
         ind  = ind + 1;
-        break;
     end
-    break;
 end
 
 % path = 'E:\newdata\';

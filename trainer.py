@@ -22,13 +22,18 @@ def cross_entropy2d(input, target, weight=None, size_average=True):
     log_p = F.log_softmax(input)
     #print(log_p.size())
     # log_p: (n*h*w, c)
-    log_p = log_p.transpose(1, 2).transpose(2, 3).contiguous().view(-1, c)
+    #print('log_p shape is ', log_p.size())
+    log_p = log_p.transpose(1, 2).transpose(2, 3)#.contiguous().view(-1, c)
+    #print(log_p.size())
+    #print(input.size())
+    ind = target.view(n, h, w, 1).repeat(1, 1, 1, c) >= 0
+    #print('indice shape is ', ind.shape)
     log_p = log_p[target.view(n, h, w, 1).repeat(1, 1, 1, c) >= 0]
     log_p = log_p.view(-1, c)
     # target: (n*h*w,)
     mask = target >= 0
     target = target[mask]
-    weight = torch.cuda.FloatTensor([1, 4])
+    weight = torch.cuda.FloatTensor([1.0, 1.0]) # original is 1.0 4.0
     weight = Variable(weight)
     loss = F.nll_loss(log_p, target, weight=weight)
     
@@ -41,8 +46,12 @@ class Trainer(object):
                  train_loader, val_loader, out, max_iter,
                  size_average=True, interval_validate=None):
         self.cuda = cuda
-
-        self.model = model
+        
+        gpus = [0, 1, 2, 3, 4, 5]
+        self.model = torch.nn.DataParallel(model, device_ids=gpus)
+        
+        self.initlr = 0.0001
+        
         self.optim = optimizer
 
         self.train_loader = train_loader
@@ -97,21 +106,16 @@ class Trainer(object):
                 enumerate(self.val_loader), total=len(self.val_loader),
                 desc='Valid iteration=%d' % self.iteration, ncols=80,
                 leave=False):
-            #print('DATA')
-            #print(data.shape)
+            #print('validate data shape is ', data.shape)
             if self.cuda:
                 data, target = data.cuda(), target.cuda()
             data, target = Variable(data, volatile=True), Variable(target)
             score = self.model(data)
-            
+            #print('score shape is ', score.size())
+            #print('target shape is ', target.size())
             loss = cross_entropy2d(score, target,
                                    size_average=self.size_average)
-            #print('Loss')
-            '''
-            if np.isnan(float(loss.data[0])):
-                raise ValueError('loss is nan while validating')
-                '''
-            #print('LossOK')
+            
             val_loss += float(loss.data[0]) #/ len(data)
             
             imgs = data.data.cpu()
@@ -158,13 +162,21 @@ class Trainer(object):
 
     def train_epoch(self):
         self.model.train()
-
+        
+        if self.epoch % 20 == 0 and self.epoch != 0:
+            for param_group in self.optim.param_groups:
+                param_group['lr'] = self.initlr * 0.1
+            self.initlr = self.initlr * 0.1
+            print('current learning rate is ')
+            print(self.initlr)
+             
         n_class = len(self.train_loader.dataset.class_names)
 
         for batch_idx, (data, target) in tqdm.tqdm(
                 enumerate(self.train_loader), total=len(self.train_loader),
                 desc='Train epoch=%d' % self.epoch, ncols=80, leave=False):
             iteration = batch_idx + self.epoch * len(self.train_loader)
+            #print('shape of validate data is ',data.shape)
             if self.iteration != 0 and (iteration - 1) != self.iteration:
                 continue  # for resuming
             self.iteration = iteration
@@ -180,12 +192,7 @@ class Trainer(object):
 
             loss = cross_entropy2d(score, target,
                                    size_average=self.size_average)
-            #loss /= len(data)
-            '''
-            if np.isnan(float(loss.data[0])):
-                print(float(loss.data[0]))
-                raise ValueError('loss is nan while training')
-            '''
+            
             loss.backward()
             self.optim.step()
 
@@ -207,7 +214,7 @@ class Trainer(object):
                     metrics.tolist() + [''] * 5 + [elapsed_time]
                 log = map(str, log)
                 f.write(','.join(log) + '\n')
-
+                
             if self.iteration >= self.max_iter:
                 break
 
